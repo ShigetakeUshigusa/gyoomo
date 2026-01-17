@@ -3,7 +3,8 @@ import requests
 import json
 import io
 import random
-import osapi_key =
+import os
+api_key = st.secrets["GEMINI_API_KEY"]
 from gtts import gTTS
 
 # --- 1. アプリの設定 ---
