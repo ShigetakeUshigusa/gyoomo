@@ -2,13 +2,13 @@ import streamlit as st
 import google.generativeai as genai
 
 # タイトルの表示
-st.title("黄色い軍団：動詞変化アプリ")
+st.title("英語動詞変化検索アプリ")
 
-# 1. 金庫から鍵を取り出す
+# 1. Secrets（金庫）から鍵を取り出す
 api_key = st.secrets["GEMINI_API_KEY"]
 genai.configure(api_key=api_key)
 
-# 2. AIの「名前」を修正（models/ をつけないのが最新のルールです）
+# 2. 最新の脳みそ（Gemini 1.5 Flash）をセット
 model = genai.GenerativeModel('gemini-1.5-flash')
 
 # 3. 入力欄
@@ -23,4 +23,4 @@ if user_input:
         # 結果を表示する
         st.write(response.text)
     except Exception as e:
-        st.error(f"エラーが発生しました。設定を確認してください: {e}")
+        st.error(f"エラーが発生しました: {e}")
