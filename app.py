@@ -1,26 +1,31 @@
 import streamlit as st
 import google.generativeai as genai
 
-# タイトルの表示
-st.title("英語動詞変化検索アプリ")
+st.title("最終診断：使える名前を調査中")
 
-# 1. Secrets（金庫）から鍵を取り出す
+# 1. 鍵（Secrets）をセット
 api_key = st.secrets["GEMINI_API_KEY"]
 genai.configure(api_key=api_key)
 
-# 2. 最新の脳みそ（Gemini 1.5 Flash）をセット
-model = genai.GenerativeModel('gemini-1.5-flash')
+try:
+    st.write("🔍 先生のAPIキーで、今すぐ使えるモデルを一覧表示します...")
+    
+    # 使えるモデルの名前をすべて取得
+    available_models = [m.name for m in genai.list_models()]
+    st.write("✅ 利用可能な名前の一覧:")
+    st.write(available_models)
+    
+    # 一覧の中から「gemini-1.5-flash」を探してテスト
+    if 'models/gemini-1.5-flash' in available_models:
+        target = 'gemini-1.5-flash'
+    else:
+        # もし見当たらない場合は、一覧の最初にあるものを使ってみる
+        target = available_models[0].replace('models/', '')
+    
+    st.write(f"🚀 '{target}' という名前で接続テストを開始します...")
+    model = genai.GenerativeModel(target)
+    response = model.generate_content("Hi")
+    st.success(f"大成功！ AIからの返事： {response.text}")
 
-# 3. 入力欄
-user_input = st.text_input("調べたい動詞を入力してね（例：write）")
-
-if user_input:
-    try:
-        # AIに質問する
-        prompt = f"英語の動詞 '{user_input}' の現在形・過去形・過去分詞形を教えて。また、覚え方のコツも短く教えて。"
-        response = model.generate_content(prompt)
-        
-        # 結果を表示する
-        st.write(response.text)
-    except Exception as e:
-        st.error(f"エラーが発生しました: {e}")
+except Exception as e:
+    st.error(f"❌ 調査中にエラーが出ました: {e}")
