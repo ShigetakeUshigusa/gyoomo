@@ -5,23 +5,21 @@ from streamlit_mic_recorder import mic_recorder
 from gtts import gTTS
 import io
 
-# --- 1. ページ設定（サッカーアイコン） ---
+# --- ページ設定（サッカーアイコン） ---
 st.set_page_config(page_title="熱血！英語ドリブル塾", page_icon="⚽", layout="wide")
 
-# --- 2. 鍵の確認（ログのエラー対策） ---
+# --- 設定（ここが心臓部です） ---
 try:
-    if "GEMINI_API_KEY" not in st.secrets:
-        st.error("⚠️ StreamlitのSecretsに 'GEMINI_API_KEY' が設定されていません！")
-        st.stop()
-    
+    # 先生がSecretsに入れた鍵を自動で読み込みます
     API_KEY = st.secrets["GEMINI_API_KEY"]
     client = genai.Client(api_key=API_KEY)
-    MODEL_NAME = "gemini-2.0-flash" # 最新・最速の安定版
+    # 最も安定している最新モデルです
+    MODEL_NAME = "gemini-2.0-flash" 
 except Exception as e:
-    st.error(f"初期設定エラー: {e}")
+    st.error(f"【設定エラー】先生、Secretsの鍵がうまく読み込めていないようです！\n{e}")
     st.stop()
 
-# --- 3. 以前の熱いUI（サッカーデザイン）の復活 ---
+# --- サッカーUIデザインの復活 ---
 st.markdown("""
 <style>
     .stApp { background-color: #f1f8e9; } 
@@ -36,25 +34,25 @@ st.markdown("""
 
 st.markdown("<h1>⚽ 熱血！英語ドリブル塾 ⚽</h1>", unsafe_allow_html=True)
 
-# --- 4. 以前の「キャラクター画像」とコーチの挨拶 ---
+# --- 画面レイアウト ---
 col1, col2 = st.columns([1, 3])
 with col1:
+    # コーチの画像を表示
     st.image("https://cdn-icons-png.flaticon.com/512/53/53283.png", width=150)
     st.markdown("**熱血コーチ**\n「さあ、英語のピッチへ出ようぜ！」")
 
 with col2:
-    # --- 5. 入力エリア（音声 ＆ 文字） ---
     st.write("### 🎤 コーチに話しかけるか、動詞を入力してくれ！")
+    # マイク機能
     audio = mic_recorder(start_prompt="声を出す（録音開始）", stop_prompt="話し終わった（送信）", key='recorder')
+    # 文字入力
     user_text = st.text_input("⌨️ 文字で入力する（例: write）")
 
-# --- 6. AIの熱血回答 ＆ ネイティブ発音生成 ---
+# --- 実行処理 ---
 if audio or user_text:
-    with st.spinner("コーチが戦術（回答）を練っているぞ..."):
-        # 先生の感性を吹き込んだシステムプロンプト
-        instruction = """あなたは熱血サッカーコーチです。
-        生徒が入力した動詞の「現在形・過去形・過去分詞形」をサッカーに例えて熱く解説してください。
-        回答の最後に、その3変化だけを英語で一行（例: write - wrote - written）と書いてください。"""
+    with st.spinner("コーチが戦術を考えているぞ..."):
+        # システムプロンプト（先生の感性）
+        instruction = "あなたは熱血サッカーコーチです。英語の動詞変化をサッカーに例えて熱く解説し、最後に 3変化（例: write - wrote - written）と書いてください。"
         
         contents = [instruction]
         if audio:
@@ -65,13 +63,12 @@ if audio or user_text:
         try:
             response = client.models.generate_content(model=MODEL_NAME, contents=contents)
             
-            # 吹き出しで表示
+            # 回答を表示
             st.markdown(f'<div class="coach-bubble">{response.text}</div>', unsafe_allow_html=True)
             
-            # --- 7. ネイティブ発音（TTS）の復活！ ---
-            # AIの回答から動詞の3変化部分を探して音声にする
-            words = user_text if user_text else "Verb conjugation"
-            tts = gTTS(text=words, lang='en') # ここでネイティブの発音を生成
+            # --- ネイティブ発音機能 ---
+            target_word = user_text if user_text else "Verb"
+            tts = gTTS(text=target_word, lang='en')
             fp = io.BytesIO()
             tts.write_to_fp(fp)
             st.write("🔊 **ネイティブの発音を確認だ！**")
@@ -79,6 +76,3 @@ if audio or user_text:
 
         except Exception as e:
             st.error(f"コーチとの通信エラーだ！: {e}")
-
-st.write("---")
-st.caption("先生の情熱をAIで再現中。")
