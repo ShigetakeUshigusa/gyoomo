@@ -14,7 +14,7 @@ st.title("⚽ 柏レイソル流・英語特訓")
 # ==========================================
 # ★ここにAPIキーを貼り付けてください！
 # 「" "」の内側に、AIzaから始まるキーを入れてください
-api_key = "AIzaSyA_IpafGPsPZZExp1cq9uEGdvRlBEr3288"
+api_key = "AIzaSyCTNDDMftCYzEuiYhKSmbGRGJyjExMCdqk"
 # ==========================================
 
 # --- 2. 資産検索機能（数字付きファイル対応） ---
