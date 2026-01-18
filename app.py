@@ -6,7 +6,7 @@ api_key = st.secrets["GEMINI_API_KEY"]
 
 # 2. AI（Gemini）の設定をする
 genai.configure(api_key=api_key)
-model = genai.GenerativeModel('gemini-1.5-flash')
+api_key = st.secrets["GEMINI_API_KEY"]
 
 st.title("黄色い軍団：動詞変化アプリ")
 
