@@ -13,7 +13,7 @@ st.title("⚽ 柏レイソル流・英語特訓")
 
 # ==========================================
 # ★ここにAPIキーを貼り付けてください！
-# 「" "」の内側に、AIzaから始まるキーを入れてください
+# 下の " " の中に、AIzaから始まるキーを入れてください
 api_key = "AIzaSyCTNDDMftCYzEuiYhKSmbGRGJyjExMCdqk"
 # ==========================================
 
@@ -164,22 +164,36 @@ else:
         result = st.session_state.last_result
         if result == 'correct':
             st.success("⚽ GOAL!!!")
+            st.balloons()
+            
+            # 1. 画像を表示 (good または perfect)
             img_k = random.choice(["good", "perfect"])
             show_image_fuzzy(img_k)
-            se_k = random.choice(["clap", "cheer"])
+            
+            # 2. 歓声SE (cheers または clap)
+            se_k = random.choice(["cheers", "clap"]) 
             play_sound_fuzzy(se_k)
             
-            st.balloons()
-            st.markdown(f"**正解:** {verb['base']} → {verb['past']} → {verb['pp']}")
+            # 3. 激励ボイス (good または perfect)
+            vc_k = random.choice(["good", "perfect"])
+            play_sound_fuzzy(vc_k)
+
+            # ★ここで0.3秒待ちます
+            time.sleep(0.3)
+
+            # 4. 英語話者の模範発音
+            # 原形、過去形、過去分詞形を読み上げます
             play_tts(f"Good job! {verb['base']}, {verb['past']}, {verb['pp']}")
             
-            # AIフィードバック
+            # テキストで正解を表示
+            st.markdown(f"**正解:** {verb['base']} → {verb['past']} → {verb['pp']}")
+            
+            # AIフィードバック（解説）
             if not st.session_state.feedback_text:
-                p_text = f"Praise student for correctly answering {verb['base']} -> {verb['past']} -> {verb['pp']}. Use Soccer metaphor. Answer in Japanese."
+                p_text = f"Praise student for {verb['base']} -> {verb['past']}. Soccer style. Japanese translation."
                 feedback = get_coach_feedback(p_text)
                 if not feedback: feedback = random.choice(backup_quotes)
                 st.session_state.feedback_text = feedback
-            
             st.info(f"🗣️ コーチ: {st.session_state.feedback_text}")
 
         else:
