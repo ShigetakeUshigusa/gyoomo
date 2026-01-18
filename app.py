@@ -1,31 +1,22 @@
 import streamlit as st
 import google.generativeai as genai
 
-st.title("最終診断：使える名前を調査中")
+# タイトル
+st.title("黄色い軍団：動詞変化アプリ")
 
-# 1. 鍵（Secrets）をセット
+# 1. 金庫（Secrets）から鍵を出す
 api_key = st.secrets["GEMINI_API_KEY"]
 genai.configure(api_key=api_key)
 
-try:
-    st.write("🔍 先生のAPIキーで、今すぐ使えるモデルを一覧表示します...")
-    
-    # 使えるモデルの名前をすべて取得
-    available_models = [m.name for m in genai.list_models()]
-    st.write("✅ 利用可能な名前の一覧:")
-    st.write(available_models)
-    
-    # 一覧の中から「gemini-1.5-flash」を探してテスト
-    if 'models/gemini-1.5-flash' in available_models:
-        target = 'gemini-1.5-flash'
-    else:
-        # もし見当たらない場合は、一覧の最初にあるものを使ってみる
-        target = available_models[0].replace('models/', '')
-    
-    st.write(f"🚀 '{target}' という名前で接続テストを開始します...")
-    model = genai.GenerativeModel(target)
-    response = model.generate_content("Hi")
-    st.success(f"大成功！ AIからの返事： {response.text}")
+# 2. AIをセット（models/ は付けないのが最新の正解です）
+model = genai.GenerativeModel('gemini-1.5-flash')
 
-except Exception as e:
-    st.error(f"❌ 調査中にエラーが出ました: {e}")
+# 3. 入力欄
+user_input = st.text_input("調べたい動詞を入力してね（例：cut）")
+
+if user_input:
+    try:
+        response = model.generate_content(f"英語の動詞 '{user_input}' の現在形・過去形・過去分詞形と覚え方を教えて。")
+        st.write(response.text)
+    except Exception as e:
+        st.error(f"エラーが発生しました: {e}")
