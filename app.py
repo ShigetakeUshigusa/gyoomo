@@ -14,7 +14,7 @@ if user_input:
     # 3. AIの「脳みそ」を準備（より確実な 'models/' プレフィックスを付けます）
     # これで NotFound を回避できる可能性が非常に高まります
     try:
-        model = genai.GenerativeModel('models/gemini-1.5-flash')
+        model = genai.GenerativeModel('gemini-1.5-flash')
         prompt = f"英語の動詞 '{user_input}' の現在形・過去形・過去分詞形を教えて。また、覚え方のコツも短く教えて。"
         response = model.generate_content(prompt)
         st.write(response.text)
