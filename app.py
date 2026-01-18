@@ -12,13 +12,9 @@ st.set_page_config(page_title="Kashiwa English Coach", page_icon="⚽")
 st.title("⚽ 柏レイソル流・英語特訓")
 
 # ==========================================
-# ★修正点: 先生が見つけたコードの唯一の変更点です
-# 金庫(Secrets)から鍵を取り出す設定にしました。これ以外は元のままです。
-try:
-    api_key = st.secrets["GEMINI_API_KEY"]
-except:
-    st.error("Secretsに GEMINI_API_KEY が設定されていません。")
-    st.stop()
+# ★ここにAPIキーを貼り付けてください！
+# 「" "」の内側に、AIzaから始まるキーを入れてください
+api_key = "AIzaSyA_IpafGPsPZZExp1cq9uEGdvRlBEr3288"
 # ==========================================
 
 # --- 2. 資産検索機能（数字付きファイル対応） ---
@@ -36,17 +32,19 @@ def find_fuzzy_asset(keyword, extension):
 
 # --- 3. AIコーチ機能 ---
 def get_coach_feedback(prompt):
-    if not api_key: return None
+    # キーが設定されていない、または初期値のままなら動かないようにする
+    if not api_key or "ここに" in api_key: return None
+    
+    # 確実に動く 1.5-flash を指定
     url_v1beta = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
-    url_v1 = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={api_key}"
     headers = {'Content-Type': 'application/json'}
     data = {"contents": [{"parts": [{"text": prompt}]}]}
-    for url in [url_v1beta, url_v1]:
-        try:
-            response = requests.post(url, headers=headers, json=data)
-            if response.status_code == 200:
-                return response.json()['candidates'][0]['content']['parts'][0]['text']
-        except: continue
+    
+    try:
+        response = requests.post(url_v1beta, headers=headers, json=data)
+        if response.status_code == 200:
+            return response.json()['candidates'][0]['content']['parts'][0]['text']
+    except: pass
     return None
 
 # --- 4. 演出機能 ---
@@ -77,6 +75,7 @@ if 'current_verb' not in st.session_state: st.session_state.current_verb = None
 if 'last_result' not in st.session_state: st.session_state.last_result = None
 if 'start_time' not in st.session_state: st.session_state.start_time = time.time() # 開始時間
 if 'end_time' not in st.session_state: st.session_state.end_time = None
+if 'feedback_text' not in st.session_state: st.session_state.feedback_text = ""
 
 # 動詞リスト
 verbs = [
@@ -111,7 +110,11 @@ if st.session_state.game_state == 'ending':
     st.header("🏆 試合終了 (Full Time)！")
     
     # 時間計算
-    elapsed_time = st.session_state.end_time - st.session_state.start_time
+    if st.session_state.end_time and st.session_state.start_time:
+        elapsed_time = st.session_state.end_time - st.session_state.start_time
+    else:
+        elapsed_time = 0
+        
     elapsed_str = f"{elapsed_time:.1f} 秒"
     
     # スコア計算
@@ -120,6 +123,7 @@ if st.session_state.game_state == 'ending':
     miss_penalty = st.session_state.misses * 5
     time_penalty = elapsed_time / 10
     total_score = max_score - miss_penalty - time_penalty
+    if total_score < 0: total_score = 0
     
     # 表示
     c1, c2, c3 = st.columns(3)
@@ -164,18 +168,20 @@ else:
             show_image_fuzzy(img_k)
             se_k = random.choice(["clap", "cheer"])
             play_sound_fuzzy(se_k)
-            vc_k = random.choice(["good", "perfect"])
-            play_sound_fuzzy(vc_k)
+            
             st.balloons()
             st.markdown(f"**正解:** {verb['base']} → {verb['past']} → {verb['pp']}")
             play_tts(f"Good job! {verb['base']}, {verb['past']}, {verb['pp']}")
             
-            if 'feedback_text' not in st.session_state:
-                p_text = f"Praise student for {verb['base']} -> {verb['past']}. Soccer style. Japanese translation."
+            # AIフィードバック
+            if not st.session_state.feedback_text:
+                p_text = f"Praise student for correctly answering {verb['base']} -> {verb['past']} -> {verb['pp']}. Use Soccer metaphor. Answer in Japanese."
                 feedback = get_coach_feedback(p_text)
                 if not feedback: feedback = random.choice(backup_quotes)
                 st.session_state.feedback_text = feedback
-            st.info(f"🗣️ {st.session_state.feedback_text}")
+            
+            st.info(f"🗣️ コーチ: {st.session_state.feedback_text}")
+
         else:
             st.error("惜しい！")
             show_image_fuzzy("miss")
@@ -183,7 +189,7 @@ else:
             st.markdown(f"**正解は:** {verb['past']} / {verb['pp']}")
             play_tts(f"The answer is {verb['past']}, and {verb['pp']}")
 
-        # 次へボタン（10ラウンド目なら終了画面へ）
+        # 次へボタン
         if st.button("次の試合へ"):
             if st.session_state.round >= 10:
                 st.session_state.end_time = time.time()
@@ -203,15 +209,19 @@ else:
             c1, c2 = st.columns(2)
             past_ans = c1.text_input("過去形", key="p")
             pp_ans = c2.text_input("過去分詞", key="pp")
+            
             if st.form_submit_button("シュート！"):
                 p_in = past_ans.strip().lower()
                 pp_in = pp_ans.strip().lower()
+                
+                # 正誤判定
                 if (p_in == verb['past'] and pp_in == verb['pp']):
                     st.session_state.score += 1
                     st.session_state.last_result = 'correct'
                 else:
                     st.session_state.last_result = 'incorrect'
                     st.session_state.misses += 1 # ミスをカウント
+                
                 st.session_state.game_state = 'result'
                 st.rerun()
 
