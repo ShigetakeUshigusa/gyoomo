@@ -1,264 +1,219 @@
 import streamlit as st
-from google import genai
-from google.genai import types
-from streamlit_mic_recorder import mic_recorder
-from gtts import gTTS
+import requests
+import json
 import io
-import base64
+import random
+import os
+import time
+from gtts import gTTS
+
+# --- 1. アプリの設定 ---
+st.set_page_config(page_title="Kashiwa English Coach", page_icon="⚽")
+st.title("⚽ 柏レイソル流・英語特訓")
 
 # ==========================================
-# 1. ページ基本設定 (柏レイソルカラー: 黄色と黒)
-# ==========================================
-st.set_page_config(
-    page_title="熱血！柏魂・英語ドリブル塾",
-    page_icon="⚽",
-    layout="wide",
-    initial_sidebar_state="collapsed"
-)
-
-# ==========================================
-# 2. CSSデザイン (日立台の熱気を再現)
-# ==========================================
-# 文字が見えなくならないよう、色を強制的に指定します
-st.markdown("""
-<style>
-    /* 全体の背景色：薄い黄色（レイソルイエローのイメージ） */
-    .stApp {
-        background-color: #FFFDE7 !important;
-    }
-    
-    /* メインタイトル */
-    h1 {
-        color: #000000 !important; /* 黒 */
-        text-align: center;
-        font-family: 'Arial Black', sans-serif;
-        text-shadow: 2px 2px 0px #FDD835; /* 黄色の影 */
-        font-size: 3em !important;
-        padding-bottom: 20px;
-        border-bottom: 5px solid #000000;
-    }
-    
-    /* サブヘッダー */
-    h3 {
-        color: #000000 !important;
-        font-weight: bold;
-    }
-
-    /* 通常のテキストも黒くする */
-    p, label, span, div {
-        color: #000000 !important;
-    }
-
-    /* コーチの吹き出しスタイル */
-    .coach-bubble {
-        background-color: #FFFFFF;
-        border: 4px solid #000000; /* 黒枠 */
-        border-radius: 20px;
-        padding: 30px;
-        margin-top: 20px;
-        margin-bottom: 20px;
-        box-shadow: 10px 10px 0px rgba(253, 216, 53, 0.8); /* 黄色い影 */
-        font-size: 1.2em;
-        line-height: 1.8;
-        color: #333333 !important;
-    }
-
-    /* ユーザーの吹き出し */
-    .user-bubble {
-        background-color: #FFF59D; /* 薄い黄色 */
-        border-radius: 15px;
-        padding: 15px;
-        margin-left: auto;
-        margin-right: 0;
-        width: fit-content;
-        border: 2px solid #FBC02D;
-        color: #000000 !important;
-    }
-
-    /* 重要な単語の強調 */
-    .highlight {
-        color: #D50000 !important; /* 赤 */
-        font-weight: bold;
-        font-size: 1.3em;
-        background-color: #FFEBEE;
-        padding: 2px 5px;
-        border-radius: 5px;
-    }
-
-    /* ボタンのスタイル */
-    .stButton>button {
-        background-color: #FDD835 !important; /* レイソルイエロー */
-        color: #000000 !important;
-        border: 2px solid #000000 !important;
-        font-weight: bold !important;
-        border-radius: 10px !important;
-    }
-    .stButton>button:hover {
-        background-color: #FBC02D !important;
-        border-color: #000000 !important;
-    }
-    
-    /* 入力ボックスのスタイル */
-    .stTextInput>div>div>input {
-        border: 2px solid #000000 !important;
-        background-color: #FFFFFF !important;
-        color: #000000 !important;
-    }
-</style>
-""", unsafe_allow_html=True)
-
-# ==========================================
-# 3. Google Gemini API設定 (最新エンジン)
-# ==========================================
+# ★修正点: 先生が見つけたコードの唯一の変更点です
+# 金庫(Secrets)から鍵を取り出す設定にしました。これ以外は元のままです。
 try:
-    if "GEMINI_API_KEY" not in st.secrets:
-        st.error("⚠️ 先生！『GEMINI_API_KEY』が金庫(Secrets)に見当たりません！確認してください！")
-        st.stop()
-    
-    API_KEY = st.secrets["GEMINI_API_KEY"]
-    client = genai.Client(api_key=API_KEY)
-    
-    # 先生のご希望に合わせ、最も安定して高性能な最新モデルを使用
-    MODEL_NAME = "gemini-2.0-flash" 
-
-except Exception as e:
-    st.error(f"❌ システムエラー発生！審判を呼んでくれ！\n詳細: {e}")
+    api_key = st.secrets["GEMINI_API_KEY"]
+except:
+    st.error("Secretsに GEMINI_API_KEY が設定されていません。")
     st.stop()
-
 # ==========================================
-# 4. タイトルとレイアウト
-# ==========================================
-st.markdown("<h1>⚽ 柏魂！英語ドリブル塾 ⚽</h1>", unsafe_allow_html=True)
 
-col1, col2 = st.columns([1, 2])
-
-with col1:
-    # 柏レイソルカラー（黄色いユニフォーム）を想起させるアイコン
-    st.image("https://cdn-icons-png.flaticon.com/512/3099/3099394.png", width=200)
-    st.markdown("""
-    <div style="text-align: center; font-weight: bold; margin-top: 10px; background-color: #000; color: #FDD835 !important; padding: 5px;">
-    熱血コーチ<br>「日立台のように熱くいこうぜ！」
-    </div>
-    """, unsafe_allow_html=True)
-
-with col2:
-    st.markdown("### 🎤 コーチにパス（質問）を出してくれ！")
-    st.write("マイクボタンを押して話すか、下のボックスに動詞を入力だ！")
-    
-    # 音声入力コンポーネント
-    audio = mic_recorder(
-        start_prompt="⚽ 録音開始 (KICK OFF)",
-        stop_prompt="🛑 録音終了 (WHISTLE)",
-        key='recorder'
-    )
-    
-    # テキスト入力コンポーネント
-    user_text = st.text_input("⌨️ キーボードでパスを出すならここだ（例: run）")
-
-# ==========================================
-# 5. 熱血コーチの人格設定 (ここが魂です)
-# ==========================================
-# 先生の記憶にある「柏レイソル」の要素を強く組み込みました
-SYSTEM_PROMPT = """
-あなたは、Jリーグ「柏レイソル」をこよなく愛する、超熱血な英語コーチです。
-生徒（ユーザー）から送られてきた「英単語（主に動詞）」について、以下のルールで徹底的に解説してください。
-
-【キャラクター設定】
-1. **口調**: 松岡修造と柏レイソルの応援団長を足して2で割ったような、とにかく熱い口調。「だ・である」調。
-2. **キーワード**: 「日立台」「太陽王」「VITORIA」「柏から世界へ」などの言葉を隙あらば使う。
-3. **例え話**: 文法用語を使わず、すべて「サッカーのプレー」に例えること。
-   - 現在形 → 基礎練習、いつものパス回し
-   - 過去形 → 終わった試合、前半戦の結果
-   - 過去分詞 → ゴールネットを揺らした後、試合終了後の確定した状態
-4. **愛情**: 生徒を「未来のファンタジスタ」と呼び、厳しくも愛のある指導をする。
-
-【回答フォーマット】
-以下の順序で出力してください。Markdown形式を使って見やすく装飾すること。
-
-1. **挨拶**: 「おい！いいパス（質問）が来たな！」など。
-2. **3段階の変化（超重要）**: 
-   大きな文字で `原形 - 過去形 - 過去分詞形` を表示。
-3. **熱血解説**: 
-   それぞれの形をサッカーのシチュエーションで説明。
-   （例：play はピッチに立つことだ！ played はホイッスルが鳴った後のことだ！）
-4. **例文シュート**: 
-   柏レイソルに関連するような、熱い例文を1つ作る。（例：オルンガはゴールを決めた、など）
-5. **最後の激**: 
-   「さあ、ピッチに戻って練習だ！」などの熱いメッセージ。
-
-注意: 出力はすべて日本語で行うこと（単語や例文は英語）。
-"""
-
-# ==========================================
-# 6. メイン処理 (AI思考 -> 回答 -> 音声)
-# ==========================================
-if audio or user_text:
-    
-    # 入力を確定させる
-    input_content = None
-    if audio:
-        st.toast("ナイスパス！音声をキャッチしたぞ！", icon="⚽")
-        input_content = audio['bytes']
-    elif user_text:
-        st.toast("ナイスパス！文字を受け取ったぞ！", icon="📝")
-        input_content = user_text
-
-    if input_content:
-        # 思考中の表示
-        with st.spinner("コーチが作戦ボードで作戦を練っているぞ... (Thinking)"):
+# --- 2. 資産検索機能（数字付きファイル対応） ---
+def find_fuzzy_asset(keyword, extension):
+    search_dirs = ['.', 'attached_assets']
+    for directory in search_dirs:
+        if os.path.exists(directory):
             try:
-                # --- A. Geminiへのリクエスト作成 ---
-                contents = [SYSTEM_PROMPT]
-                
-                if audio:
-                    # 音声データを直接渡す (Gemini 2.5の真骨頂)
-                    contents.append(types.Part.from_bytes(data=audio['bytes'], mime_type='audio/wav'))
-                    contents.append("この音声で言っている動詞について教えてくれ！")
+                files = os.listdir(directory)
+                for f in files:
+                    if keyword.lower() in f.lower() and f.lower().endswith(extension):
+                        return os.path.join(directory, f)
+            except: continue
+    return None
+
+# --- 3. AIコーチ機能 ---
+def get_coach_feedback(prompt):
+    if not api_key: return None
+    url_v1beta = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+    url_v1 = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={api_key}"
+    headers = {'Content-Type': 'application/json'}
+    data = {"contents": [{"parts": [{"text": prompt}]}]}
+    for url in [url_v1beta, url_v1]:
+        try:
+            response = requests.post(url, headers=headers, json=data)
+            if response.status_code == 200:
+                return response.json()['candidates'][0]['content']['parts'][0]['text']
+        except: continue
+    return None
+
+# --- 4. 演出機能 ---
+backup_quotes = ["ナイスシュート！", "素晴らしい反応だ！", "完璧なフォームだ！"]
+
+def play_sound_fuzzy(keyword):
+    found_path = find_fuzzy_asset(keyword, ".mp3")
+    if found_path: st.audio(found_path, format='audio/mp3', autoplay=True)
+
+def show_image_fuzzy(keyword):
+    found_path = find_fuzzy_asset(keyword, ".gif")
+    if found_path: st.image(found_path)
+
+def play_tts(text):
+    try:
+        tts = gTTS(text=text, lang='en')
+        audio_fp = io.BytesIO()
+        tts.write_to_fp(audio_fp)
+        st.audio(audio_fp, format='audio/mp3')
+    except: pass
+
+# --- 5. ゲームデータ初期化 ---
+if 'score' not in st.session_state: st.session_state.score = 0
+if 'misses' not in st.session_state: st.session_state.misses = 0 # ミス数
+if 'round' not in st.session_state: st.session_state.round = 1
+if 'game_state' not in st.session_state: st.session_state.game_state = 'answering'
+if 'current_verb' not in st.session_state: st.session_state.current_verb = None
+if 'last_result' not in st.session_state: st.session_state.last_result = None
+if 'start_time' not in st.session_state: st.session_state.start_time = time.time() # 開始時間
+if 'end_time' not in st.session_state: st.session_state.end_time = None
+
+# 動詞リスト
+verbs = [
+    {"base": "write", "past": "wrote", "pp": "written", "ja": "書く"},
+    {"base": "go", "past": "went", "pp": "gone", "ja": "行く"},
+    {"base": "run", "past": "ran", "pp": "run", "ja": "走る"},
+    {"base": "eat", "past": "ate", "pp": "eaten", "ja": "食べる"},
+    {"base": "see", "past": "saw", "pp": "seen", "ja": "見る"},
+    {"base": "speak", "past": "spoke", "pp": "spoken", "ja": "話す"},
+    {"base": "take", "past": "took", "pp": "taken", "ja": "取る"},
+    {"base": "make", "past": "made", "pp": "made", "ja": "作る"},
+    {"base": "come", "past": "came", "pp": "come", "ja": "来る"},
+    {"base": "know", "past": "knew", "pp": "known", "ja": "知る"},
+    {"base": "give", "past": "gave", "pp": "given", "ja": "与える"},
+    {"base": "get", "past": "got", "pp": "got", "ja": "得る"},
+    {"base": "buy", "past": "bought", "pp": "bought", "ja": "買う"},
+    {"base": "think", "past": "thought", "pp": "thought", "ja": "思う"},
+    {"base": "teach", "past": "taught", "pp": "taught", "ja": "教える"},
+    {"base": "catch", "past": "caught", "pp": "caught", "ja": "捕る"},
+    {"base": "bring", "past": "brought", "pp": "brought", "ja": "持来る"},
+    {"base": "fly", "past": "flew", "pp": "flown", "ja": "飛ぶ"},
+    {"base": "swim", "past": "swam", "pp": "swum", "ja": "泳ぐ"},
+    {"base": "cut", "past": "cut", "pp": "cut", "ja": "切る"}
+]
+
+# --- 6. 画面表示 ---
+st.markdown("---")
+
+# === C. ゲーム終了画面（10問終了後） ===
+if st.session_state.game_state == 'ending':
+    st.balloons()
+    st.header("🏆 試合終了 (Full Time)！")
+    
+    # 時間計算
+    elapsed_time = st.session_state.end_time - st.session_state.start_time
+    elapsed_str = f"{elapsed_time:.1f} 秒"
+    
+    # スコア計算
+    # 総合点 = 100 - (ミスx5) - (時間/10)
+    max_score = 100
+    miss_penalty = st.session_state.misses * 5
+    time_penalty = elapsed_time / 10
+    total_score = max_score - miss_penalty - time_penalty
+    
+    # 表示
+    c1, c2, c3 = st.columns(3)
+    c1.metric("⏱️ 経過時間", elapsed_str)
+    c2.metric("❌ ミス回数", f"{st.session_state.misses} 回")
+    c3.metric("💯 総合スコア", f"{int(total_score)} 点")
+    
+    st.write(f"内訳: 100点 - ミス({miss_penalty}点) - タイム減点({int(time_penalty)}点)")
+    
+    # 激励メッセージ
+    if total_score >= 80:
+        st.success("素晴らしい！ プロ級のストライカーだ！")
+        show_image_fuzzy("perfect")
+    elif total_score >= 50:
+        st.info("ナイスファイト！ その調子で練習しよう！")
+        show_image_fuzzy("good")
+    else:
+        st.warning("もっと練習して、次はハットトリックを狙おう！")
+    
+    # リトライボタン
+    if st.button("もう一度挑戦する (Restart)"):
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
+        st.rerun()
+
+# === A/B. ゲームプレイ中 ===
+else:
+    col1, col2 = st.columns(2)
+    col1.metric("得点", f"{st.session_state.score} 点")
+    col2.metric("ラウンド", f"第 {st.session_state.round} / 10 節")
+
+    if st.session_state.current_verb is None:
+        st.session_state.current_verb = random.choice(verbs)
+    verb = st.session_state.current_verb
+
+    # === 結果画面 ===
+    if st.session_state.game_state == 'result':
+        result = st.session_state.last_result
+        if result == 'correct':
+            st.success("⚽ GOAL!!!")
+            img_k = random.choice(["good", "perfect"])
+            show_image_fuzzy(img_k)
+            se_k = random.choice(["clap", "cheer"])
+            play_sound_fuzzy(se_k)
+            vc_k = random.choice(["good", "perfect"])
+            play_sound_fuzzy(vc_k)
+            st.balloons()
+            st.markdown(f"**正解:** {verb['base']} → {verb['past']} → {verb['pp']}")
+            play_tts(f"Good job! {verb['base']}, {verb['past']}, {verb['pp']}")
+            
+            if 'feedback_text' not in st.session_state:
+                p_text = f"Praise student for {verb['base']} -> {verb['past']}. Soccer style. Japanese translation."
+                feedback = get_coach_feedback(p_text)
+                if not feedback: feedback = random.choice(backup_quotes)
+                st.session_state.feedback_text = feedback
+            st.info(f"🗣️ {st.session_state.feedback_text}")
+        else:
+            st.error("惜しい！")
+            show_image_fuzzy("miss")
+            play_sound_fuzzy("miss")
+            st.markdown(f"**正解は:** {verb['past']} / {verb['pp']}")
+            play_tts(f"The answer is {verb['past']}, and {verb['pp']}")
+
+        # 次へボタン（10ラウンド目なら終了画面へ）
+        if st.button("次の試合へ"):
+            if st.session_state.round >= 10:
+                st.session_state.end_time = time.time()
+                st.session_state.game_state = 'ending'
+            else:
+                st.session_state.game_state = 'answering'
+                st.session_state.round += 1
+                st.session_state.current_verb = None
+                if 'feedback_text' in st.session_state: del st.session_state.feedback_text
+            st.rerun()
+
+    # === 回答画面 ===
+    else:
+        st.info(f"パスが来た！:  **{verb['base']}** （{verb['ja']}）")
+        with st.form(key=f"game_form_{st.session_state.round}"):
+            st.write("▼ 入力 (Tabで移動)")
+            c1, c2 = st.columns(2)
+            past_ans = c1.text_input("過去形", key="p")
+            pp_ans = c2.text_input("過去分詞", key="pp")
+            if st.form_submit_button("シュート！"):
+                p_in = past_ans.strip().lower()
+                pp_in = pp_ans.strip().lower()
+                if (p_in == verb['past'] and pp_in == verb['pp']):
+                    st.session_state.score += 1
+                    st.session_state.last_result = 'correct'
                 else:
-                    # テキストデータを渡す
-                    contents.append(f"この動詞について教えてくれ： {user_text}")
+                    st.session_state.last_result = 'incorrect'
+                    st.session_state.misses += 1 # ミスをカウント
+                st.session_state.game_state = 'result'
+                st.rerun()
 
-                # --- B. AIからの回答生成 ---
-                response = client.models.generate_content(
-                    model=MODEL_NAME,
-                    contents=contents
-                )
-                
-                # --- C. 回答の表示 (吹き出し) ---
-                st.markdown(f'<div class="coach-bubble">{response.text}</div>', unsafe_allow_html=True)
-                
-                # --- D. ネイティブ発音の生成 (gTTS) ---
-                # 解説文の中から英単語だけを抽出するのは難しいため、
-                # ユーザーが入力した単語（または音声から推測される単語）の発音を作ります。
-                
-                # 音声入力の場合は、AIに「何の単語だったか」を聞き出す処理を省略するため、
-                # 簡易的に「Listen to the pronunciation」と言わせるか、
-                # テキスト入力がある場合のみその単語を読み上げます。
-                
-                word_to_speak = "Practice makes perfect!" # デフォルト
-                if user_text:
-                    word_to_speak = user_text
-                
-                # 音声合成
-                tts = gTTS(text=word_to_speak, lang='en')
-                audio_fp = io.BytesIO()
-                tts.write_to_fp(audio_fp)
-                audio_fp.seek(0)
-                
-                st.write("---")
-                st.markdown("### 🔊 ネイティブのキック（発音）を確認しろ！")
-                st.audio(audio_fp, format='audio/mp3')
-
-            except Exception as e:
-                st.error(f"レッドカード！システム退場！エラーが出たぞ！\n{e}")
-
-# ==========================================
-# 7. フッター
-# ==========================================
-st.write("---")
-st.markdown("""
-<div style="text-align: center; color: #555;">
-    Powered by <b>Gemini 2.5 Flash</b> | 柏魂 English Academy <br>
-    Copyright © 2026 Yellow Corps. All Rights Reserved.
-</div>
-""", unsafe_allow_html=True)
+st.write("")
+st.caption("Produced by Kashiwa Yellow Army School")
